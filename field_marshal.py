@@ -575,10 +575,6 @@ def _execute_dispatch_with_dialectic(target: str, payload):
 
 _init_rag()
 
-# Start supervision watcher thread
-_watcher_thread = threading.Thread(target=_supervision_watcher, daemon=True)
-_watcher_thread.start()
-
 # ---------------------------------------------------------------------------
 # Entry point (terminal mode — runs startup self-test then loops)
 # ---------------------------------------------------------------------------
@@ -588,6 +584,10 @@ if __name__ == "__main__":
     print(f"Bondsman model: {_BONDSMAN_MODEL}")
     print(f"Lord model: {_LORD_MODEL}")
     print(f"Router: {_ROUTER_URL}")
+
+    # Start supervision watcher thread only when running as a standalone process
+    _watcher_thread = threading.Thread(target=_supervision_watcher, daemon=True)
+    _watcher_thread.start()
 
     startup_self_test(get_bondsman_history())
     print("Self-test complete. Field Marshal is operational.")
