@@ -17,6 +17,14 @@ from flask import Flask, Response, jsonify, render_template, request
 import os
 
 # ---------------------------------------------------------------------------
+# Configuration / limits
+# ---------------------------------------------------------------------------
+
+# Maximum length (in characters) for base64-encoded screenshots attached to evidence.
+# This limits in-memory usage even if a client sends a very large screenshot.
+MAX_EVIDENCE_SCREENSHOT_B64_LEN = 1_000_000  # ~1 MB of base64 data
+
+# ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
 
@@ -293,17 +301,58 @@ def task_reply_get(task_id: str):
 @app.route("/evidence", methods=["POST"])
 def evidence_submit():
     packet = request.get_json(force=True, silent=True) or {}
+
+    # Basic schema and size validation to prevent abuse (e.g., huge screenshots).
+    if not isinstance(packet, dict):
+        return jsonify({"error": "Invalid JSON payload; expected an object"}), 400
+
+    task_id = packet.get("task_id")
+    source_agent = packet.get("source_agent")
+    severity = packet.get("severity", "info")
+    caption = packet.get("caption", "")
+    screenshot_b64 = packet.get("screenshot_b64")
+
+    # Required fields must be non-empty strings.
+    if not isinstance(task_id, str) or not task_id:
+        return jsonify({"error": "Field 'task_id' is required and must be a non-empty string"}), 400
+    if not isinstance(source_agent, str) or not source_agent:
+        return jsonify({"error": "Field 'source_agent' is required and must be a non-empty string"}), 400
+
+    # Optional fields: normalize types and enforce size constraints.
+    if not isinstance(severity, str):
+        return jsonify({"error": "Field 'severity' must be a string"}), 400
+
+    if not isinstance(caption, str):
+        return jsonify({"error": "Field 'caption' must be a string if provided"}), 400
+    # Truncate caption to 200 characters (existing behavior).
+    caption = caption[:200]
+    packet["caption"] = caption
+
+    if screenshot_b64 is not None:
+        if not isinstance(screenshot_b64, str):
+            return jsonify({"error": "Field 'screenshot_b64' must be a base64 string if provided"}), 400
+        if len(screenshot_b64) > MAX_EVIDENCE_SCREENSHOT_B64_LEN:
+            return (
+                jsonify(
+                    {
+                        "error": "Field 'screenshot_b64' is too large",
+                        "max_len": MAX_EVIDENCE_SCREENSHOT_B64_LEN,
+                    }
+                ),
+                413,
+            )
+
     packet.setdefault("timestamp", time.time())
     with _lock:
         _evidence_queue.append(packet)
     _push_sse(
         "evidence",
         {
-            "task_id": packet.get("task_id"),
-            "source_agent": packet.get("source_agent"),
-            "severity": packet.get("severity", "info"),
-            "caption": packet.get("caption", "")[:200],
-            "has_screenshot": bool(packet.get("screenshot_b64")),
+            "task_id": task_id,
+            "source_agent": source_agent,
+            "severity": severity,
+            "caption": caption,
+            "has_screenshot": bool(screenshot_b64),
         },
     )
     return jsonify({"status": "received"}), 200
