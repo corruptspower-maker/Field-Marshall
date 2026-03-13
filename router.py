@@ -113,14 +113,20 @@ def _enforce_task_auth():
     is exposed beyond localhost.
 
     Rules:
-      - Any path not starting with /task/ is unaffected.
+      - Only specific sensitive paths are protected:
+          * /task/...
+          * /tasks...
+          * /evidence...
+          * /chat...
+          * /stream...
       - Localhost (127.0.0.1, ::1) access is always allowed.
       - For non-localhost access:
           * If FM_SHARED_TOKEN is unset, deny access.
           * If FM_SHARED_TOKEN is set, require it via header or query param.
     """
     path = request.path or ""
-    if not path.startswith("/task/"):
+    protected_prefixes = ("/task/", "/tasks", "/evidence", "/chat", "/stream")
+    if not any(path.startswith(p) for p in protected_prefixes):
         return None
 
     remote = request.remote_addr or ""
