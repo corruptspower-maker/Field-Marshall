@@ -13,6 +13,7 @@ import uuid
 from collections import deque
 
 from flask import Flask, Response, jsonify, render_template, request
+import os
 
 # ---------------------------------------------------------------------------
 # App setup
@@ -59,6 +60,44 @@ def _push_sse(event_type: str, data: dict):
         _sse_queue.put_nowait({"type": event_type, "data": data, "ts": time.time()})
     except queue.Full:
         pass
+
+
+# ---------------------------------------------------------------------------
+# Authentication / authorization
+# ---------------------------------------------------------------------------
+
+_SHARED_TOKEN = os.environ.get("FM_SHARED_TOKEN")
+
+
+@app.before_request
+def _enforce_task_auth():
+    """
+    Protect task-related endpoints so they cannot be abused if the router
+    is exposed beyond localhost.
+
+    Rules:
+      - Any path not starting with /task/ is unaffected.
+      - Localhost (127.0.0.1, ::1) access is always allowed.
+      - For non-localhost access:
+          * If FM_SHARED_TOKEN is unset, deny access.
+          * If FM_SHARED_TOKEN is set, require it via header or query param.
+    """
+    path = request.path or ""
+    if not path.startswith("/task/"):
+        return None
+
+    remote = request.remote_addr or ""
+    if remote in ("127.0.0.1", "::1"):
+        return None
+
+    if not _SHARED_TOKEN:
+        return jsonify({"error": "task API is restricted to localhost"}), 403
+
+    token = request.headers.get("X-Field-Marshal-Token") or request.args.get("token")
+    if token != _SHARED_TOKEN:
+        return jsonify({"error": "unauthorized"}), 401
+
+    return None
 
 
 # ---------------------------------------------------------------------------
