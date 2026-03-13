@@ -14,7 +14,7 @@ import os
 import re
 import threading
 import time
-from typing import Optional
+from typing import Any, Optional
 
 import requests
 
@@ -341,7 +341,7 @@ _DISPATCH_RE = re.compile(
 )
 
 
-def _parse_dispatches(text: str) -> list[tuple[str, str]]:
+def _parse_dispatches(text: str) -> list[tuple[str, Any]]:
     """Extract (target, payload) pairs from Bondsman response text."""
     matches = _DISPATCH_RE.findall(text)
     result = []
