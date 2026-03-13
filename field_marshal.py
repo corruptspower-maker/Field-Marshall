@@ -274,15 +274,27 @@ def lord_bondsman_dialogue(
 
 
 # ---------------------------------------------------------------------------
-# SSE event push helper (imports router lazily to avoid circular import)
+# SSE event push helper
 # ---------------------------------------------------------------------------
 
 
 def _push_event(event_type: str, data: dict):
+    """
+    Push an SSE-style event to the router process.
+
+    This uses HTTP so it works even when field_marshal.py and router.py run
+    as separate OS processes.
+    """
     try:
-        import router as _router  # type: ignore
-        _router.push_sse_event(event_type, data)
+        # POST to the router's event endpoint; router is responsible for
+        # broadcasting this to connected SSE clients.
+        requests.post(
+            f"{_ROUTER_URL}/events",
+            json={"type": event_type, "data": data},
+            timeout=5,
+        )
     except Exception:
+        # Best-effort: failure to push an event should not break core logic.
         pass
 
 
