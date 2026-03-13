@@ -1,0 +1,12 @@
+writing:
+  treatment_system: "You convert concept input into structured treatment."
+  beat_sheet_system: "You convert treatment into bounded beats."
+  shot_packet_system: "You emit machine-executable shot packets."
+
+qa:
+  still_image_rubric:
+    - character_count
+    - setting_match
+    - anatomy_integrity
+    - watermark_absence
+    - face_consistency

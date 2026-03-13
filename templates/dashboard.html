@@ -69,6 +69,35 @@
         <span class="panel-title">Live Activity Feed</span>
         <button id="feed-clear" class="clear-btn" type="button">Clear</button>
       </div>
+      <div class="model-controls" id="model-controls">
+        <div class="model-controls-title">Model Command Console</div>
+        <div class="model-controls-row">
+          <label for="model-mode">Mode</label>
+          <select id="model-mode" class="model-select">
+            <option value="dual">Dual (Bondsman + Lord)</option>
+            <option value="single">Single (one model)</option>
+          </select>
+        </div>
+        <div class="model-controls-row hidden-row" id="single-model-row">
+          <label for="single-model-select">Unified Model</label>
+          <select id="single-model-select" class="model-select"></select>
+          <span class="model-size" id="single-model-size">size: -</span>
+        </div>
+        <div class="model-controls-row" id="bondsman-model-row">
+          <label for="bondsman-model-select">Bondsman</label>
+          <select id="bondsman-model-select" class="model-select"></select>
+          <span class="model-size" id="bondsman-model-size">size: -</span>
+        </div>
+        <div class="model-controls-row" id="lord-model-row">
+          <label for="lord-model-select">Lord</label>
+          <select id="lord-model-select" class="model-select"></select>
+          <span class="model-size" id="lord-model-size">size: -</span>
+        </div>
+        <div class="model-controls-actions">
+          <button id="models-refresh" class="clear-btn" type="button">Reload Models</button>
+          <button id="models-apply" class="send-btn" type="button">Apply</button>
+        </div>
+      </div>
       <div class="feed-entries" id="feed-entries">
         <div class="feed-entry status-entry">
           <span class="feed-ts" id="connect-ts"></span>

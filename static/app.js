@@ -132,6 +132,23 @@ chatInput.addEventListener('keydown', e => {
 
 const feedEntries = document.getElementById('feed-entries');
 const clearBtn    = document.getElementById('feed-clear');
+const bondsmanModelPill = document.getElementById('bondsman-model');
+const lordModelPill = document.getElementById('lord-model');
+
+const modelModeSelect = document.getElementById('model-mode');
+const singleModelRow = document.getElementById('single-model-row');
+const singleModelSelect = document.getElementById('single-model-select');
+const singleModelSize = document.getElementById('single-model-size');
+const bondsmanModelRow = document.getElementById('bondsman-model-row');
+const bondsmanModelSelect = document.getElementById('bondsman-model-select');
+const bondsmanModelSize = document.getElementById('bondsman-model-size');
+const lordModelRow = document.getElementById('lord-model-row');
+const lordModelSelect = document.getElementById('lord-model-select');
+const lordModelSize = document.getElementById('lord-model-size');
+const modelsApplyBtn = document.getElementById('models-apply');
+const modelsRefreshBtn = document.getElementById('models-refresh');
+
+let availableModels = [];
 
 clearBtn.addEventListener('click', () => {
   feedEntries.innerHTML = '';
@@ -151,6 +168,144 @@ function appendFeedEntry(cssClass, speakerLabel, speakerCss, bodyHtml, extra) {
   entry.innerHTML = inner;
   feedEntries.appendChild(entry);
   scrollToBottom(feedEntries);
+}
+
+function getModelById(id) {
+  return availableModels.find(m => m.id === id) || null;
+}
+
+function modelDisplayText(model) {
+  if (!model) return '[unknown model]';
+  return `${model.id} (${model.size_label || 'unknown'})`;
+}
+
+function setModelOptions(selectEl, selectedId) {
+  if (!selectEl) return;
+  selectEl.innerHTML = '';
+  if (!availableModels.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = '[no models found]';
+    selectEl.appendChild(opt);
+    return;
+  }
+  for (const model of availableModels) {
+    const opt = document.createElement('option');
+    opt.value = model.id;
+    opt.textContent = modelDisplayText(model);
+    if (selectedId && selectedId === model.id) opt.selected = true;
+    selectEl.appendChild(opt);
+  }
+}
+
+function setSizeLabel(labelEl, modelId) {
+  if (!labelEl) return;
+  const model = getModelById(modelId);
+  labelEl.textContent = `size: ${model ? (model.size_label || 'unknown') : 'unknown'}`;
+}
+
+function updateSizeLabels() {
+  setSizeLabel(singleModelSize, singleModelSelect ? singleModelSelect.value : '');
+  setSizeLabel(bondsmanModelSize, bondsmanModelSelect ? bondsmanModelSelect.value : '');
+  setSizeLabel(lordModelSize, lordModelSelect ? lordModelSelect.value : '');
+}
+
+function setModeRows(mode) {
+  const m = (mode || 'dual').toLowerCase();
+  if (singleModelRow) singleModelRow.style.display = m === 'single' ? '' : 'none';
+  if (bondsmanModelRow) bondsmanModelRow.style.display = m === 'single' ? 'none' : '';
+  if (lordModelRow) lordModelRow.style.display = m === 'single' ? 'none' : '';
+}
+
+function reflectActiveModels(active) {
+  const mode = active.mode || ((active.bondsman_model && active.bondsman_model === active.lord_model) ? 'single' : 'dual');
+  if (modelModeSelect) modelModeSelect.value = mode;
+  setModeRows(mode);
+
+  setModelOptions(singleModelSelect, active.bondsman_model);
+  setModelOptions(bondsmanModelSelect, active.bondsman_model);
+  setModelOptions(lordModelSelect, active.lord_model);
+
+  if (singleModelSelect && active.bondsman_model) singleModelSelect.value = active.bondsman_model;
+  if (bondsmanModelSelect && active.bondsman_model) bondsmanModelSelect.value = active.bondsman_model;
+  if (lordModelSelect && active.lord_model) lordModelSelect.value = active.lord_model;
+
+  if (bondsmanModelPill) bondsmanModelPill.textContent = active.bondsman_model || '[unset]';
+  if (lordModelPill) lordModelPill.textContent = active.lord_model || '[unset]';
+  updateSizeLabels();
+}
+
+function loadAvailableModels() {
+  return fetch('/api/models/available')
+    .then(r => r.json())
+    .then(data => {
+      availableModels = Array.isArray(data.models) ? data.models : [];
+      setModelOptions(singleModelSelect, singleModelSelect ? singleModelSelect.value : '');
+      setModelOptions(bondsmanModelSelect, bondsmanModelSelect ? bondsmanModelSelect.value : '');
+      setModelOptions(lordModelSelect, lordModelSelect ? lordModelSelect.value : '');
+      updateSizeLabels();
+      if (!availableModels.length) {
+        appendFeedEntry('status-entry', null, '', 'No available models reported by LM Studio.', null);
+      }
+    })
+    .catch(err => {
+      appendFeedEntry('error-entry', 'SYSTEM', '', escapeHtml('Model discovery failed: ' + err.message), null);
+      availableModels = [];
+      setModelOptions(singleModelSelect, '');
+      setModelOptions(bondsmanModelSelect, '');
+      setModelOptions(lordModelSelect, '');
+      updateSizeLabels();
+    });
+}
+
+function loadActiveModels() {
+  return fetch('/api/models/active')
+    .then(r => r.json())
+    .then(active => {
+      reflectActiveModels(active || {});
+    })
+    .catch(err => {
+      appendFeedEntry('error-entry', 'SYSTEM', '', escapeHtml('Active model load failed: ' + err.message), null);
+    });
+}
+
+function applyModelSelection() {
+  if (!modelsApplyBtn) return;
+  const mode = modelModeSelect ? modelModeSelect.value : 'dual';
+  let payload;
+  if (mode === 'single') {
+    payload = {
+      mode: 'single',
+      model: singleModelSelect ? singleModelSelect.value : '',
+    };
+  } else {
+    payload = {
+      mode: 'dual',
+      bondsman_model: bondsmanModelSelect ? bondsmanModelSelect.value : '',
+      lord_model: lordModelSelect ? lordModelSelect.value : '',
+    };
+  }
+
+  modelsApplyBtn.disabled = true;
+  fetch('/api/models/active', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+    .then(r => r.json().then(data => ({ ok: r.ok, data })))
+    .then(({ ok, data }) => {
+      if (!ok) {
+        throw new Error(data.error || 'model update failed');
+      }
+      reflectActiveModels(data);
+      appendFeedEntry('success-entry', 'SYSTEM', '', 'Model selection updated.', null);
+    })
+    .catch(err => {
+      appendFeedEntry('error-entry', 'SYSTEM', '', escapeHtml('Model update failed: ' + err.message), null);
+    })
+    .finally(() => {
+      modelsApplyBtn.disabled = false;
+    });
 }
 
 function handleSSEEvent(event) {
@@ -218,6 +373,9 @@ function handleSSEEvent(event) {
     case 'status': {
       const eventName = data.event || '';
       if (eventName === 'chat_response') return;  // Skip internal events
+      if (eventName === 'models_updated') {
+        reflectActiveModels(data);
+      }
       appendFeedEntry(
         'status-entry', null, '',
         escapeHtml(JSON.stringify(data).substring(0, 200)),
@@ -276,6 +434,41 @@ function refreshHealth() {
 
 // ---- Init ------------------------------------------------------------------
 
+if (modelModeSelect) {
+  modelModeSelect.addEventListener('change', () => {
+    setModeRows(modelModeSelect.value);
+    if (modelModeSelect.value === 'single' && singleModelSelect && bondsmanModelSelect) {
+      singleModelSelect.value = bondsmanModelSelect.value;
+    }
+    updateSizeLabels();
+  });
+}
+
+if (singleModelSelect) {
+  singleModelSelect.addEventListener('change', () => {
+    updateSizeLabels();
+  });
+}
+if (bondsmanModelSelect) {
+  bondsmanModelSelect.addEventListener('change', () => {
+    updateSizeLabels();
+  });
+}
+if (lordModelSelect) {
+  lordModelSelect.addEventListener('change', () => {
+    updateSizeLabels();
+  });
+}
+if (modelsApplyBtn) {
+  modelsApplyBtn.addEventListener('click', applyModelSelection);
+}
+if (modelsRefreshBtn) {
+  modelsRefreshBtn.addEventListener('click', () => {
+    loadAvailableModels().then(() => loadActiveModels());
+  });
+}
+
 connectSSE();
+loadAvailableModels().then(() => loadActiveModels());
 refreshHealth();
 setInterval(refreshHealth, 10000);  // Poll health every 10s

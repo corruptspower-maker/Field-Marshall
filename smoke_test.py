@@ -36,10 +36,20 @@ BONDSMAN_MODEL = LMS["llm_model"]
 LORD_MODEL = LMS["lord_model"]
 ROUTER_URL = f"http://{CFG['router']['host']}:{CFG['router']['port']}"
 
-HEADERS = {
-    "Authorization": f"Bearer {API_TOKEN}",
-    "Content-Type": "application/json",
-}
+def _lmstudio_headers() -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    token = str(
+        os.environ.get("LM_STUDIO_API_TOKEN")
+        or os.environ.get("FIELD_MARSHAL_LMSTUDIO_API_TOKEN")
+        or API_TOKEN
+        or ""
+    ).strip()
+    if token and "YOUR_LM_STUDIO" not in token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+HEADERS = _lmstudio_headers()
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -124,11 +134,17 @@ def test_lmstudio_reachable():
             fix=f"Load {LORD_MODEL} in LM Studio before launching.",
         )
     except Exception as exc:
+        fix = "Ensure LM Studio is running on port 1234 with API server enabled."
+        if "401" in str(exc):
+            fix = (
+                "LM Studio requires an API token. Set LM_STUDIO_API_TOKEN (or "
+                "FIELD_MARSHAL_LMSTUDIO_API_TOKEN), or place a valid token in config.json."
+            )
         check(
             "LM Studio reachable",
             False,
             str(exc),
-            fix="Ensure LM Studio is running on port 1234 with API server enabled.",
+            fix=fix,
         )
 
 
@@ -145,11 +161,17 @@ def test_bondsman_text():
         ok = bool(response and len(response) > 5)
         check("Bondsman responds to text", ok, response[:120] if ok else "Empty response")
     except Exception as exc:
+        fix = f"Ensure {BONDSMAN_MODEL} is loaded and responding."
+        if "401" in str(exc):
+            fix = (
+                "LM Studio requires an API token. Set LM_STUDIO_API_TOKEN (or "
+                "FIELD_MARSHAL_LMSTUDIO_API_TOKEN), or place a valid token in config.json."
+            )
         check(
             "Bondsman responds to text",
             False,
             str(exc),
-            fix=f"Ensure {BONDSMAN_MODEL} is loaded and responding.",
+            fix=fix,
         )
 
 
@@ -166,11 +188,17 @@ def test_lord_text():
         ok = bool(response and len(response) > 5)
         check("Lord responds to text", ok, response[:120] if ok else "Empty response")
     except Exception as exc:
+        fix = f"Ensure {LORD_MODEL} is loaded and responding."
+        if "401" in str(exc):
+            fix = (
+                "LM Studio requires an API token. Set LM_STUDIO_API_TOKEN (or "
+                "FIELD_MARSHAL_LMSTUDIO_API_TOKEN), or place a valid token in config.json."
+            )
         check(
             "Lord responds to text",
             False,
             str(exc),
-            fix=f"Ensure {LORD_MODEL} is loaded and responding.",
+            fix=fix,
         )
 
 
@@ -201,11 +229,17 @@ def test_lord_vision():
             fix=f"Ensure {LORD_MODEL} supports vision (image_url content type).",
         )
     except Exception as exc:
+        fix = f"Ensure {LORD_MODEL} supports vision and is properly loaded."
+        if "401" in str(exc):
+            fix = (
+                "LM Studio requires an API token. Set LM_STUDIO_API_TOKEN (or "
+                "FIELD_MARSHAL_LMSTUDIO_API_TOKEN), or place a valid token in config.json."
+            )
         check(
             "Lord responds to screenshot (vision)",
             False,
             str(exc),
-            fix=f"Ensure {LORD_MODEL} supports vision and is properly loaded.",
+            fix=fix,
         )
 
 
@@ -301,7 +335,13 @@ def test_mini_dialectic():
         )
 
     except Exception as exc:
-        check("Mini dialectic", False, str(exc))
+        fix = "Ensure both models are loaded and LM Studio is reachable."
+        if "401" in str(exc):
+            fix = (
+                "LM Studio requires an API token. Set LM_STUDIO_API_TOKEN (or "
+                "FIELD_MARSHAL_LMSTUDIO_API_TOKEN), or place a valid token in config.json."
+            )
+        check("Mini dialectic", False, str(exc), fix=fix)
 
 
 # ---------------------------------------------------------------------------

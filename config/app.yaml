@@ -1,0 +1,21 @@
+app:
+  name: field-marshal-factory
+  env: local
+
+api:
+  host: 127.0.0.1
+  port: 5050
+  debug: false
+
+store:
+  db_path: data/registry.db
+
+paths:
+  manifests_dir: data/manifests
+  logs_dir: data/logs
+  cache_dir: data/cache
+  assets_root: assets
+
+bootstrap:
+  run_health_check: true
+  open_ui: false

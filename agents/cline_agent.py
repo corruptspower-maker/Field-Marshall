@@ -42,16 +42,26 @@ _MAX_OUTPUT = _CFG["limits"]["max_output_bytes"]
 _AGENT_ID = f"cline-{uuid.uuid4().hex[:8]}"
 _MAX_TURNS = 6
 
+
+def _lmstudio_headers() -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    token = str(
+        os.environ.get("LM_STUDIO_API_TOKEN")
+        or os.environ.get("FIELD_MARSHAL_LMSTUDIO_API_TOKEN")
+        or _API_TOKEN
+        or ""
+    ).strip()
+    if token and "YOUR_LM_STUDIO" not in token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
 # ---------------------------------------------------------------------------
 # LLM helper
 # ---------------------------------------------------------------------------
 
 def _llm(messages: list[dict], temperature: float = 0.3) -> str:
     url = f"{_BASE_LMS_URL}/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {_API_TOKEN}",
-        "Content-Type": "application/json",
-    }
+    headers = _lmstudio_headers()
     payload = {
         "model": _BONDSMAN_MODEL,
         "messages": messages,

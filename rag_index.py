@@ -28,13 +28,23 @@ _EMBED_MODEL = _LMS["embed_model"]
 _RAG_PATH = os.path.join(_BASE_DIR, "rag_db")
 
 
+def _lmstudio_headers() -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    token = str(
+        os.environ.get("LM_STUDIO_API_TOKEN")
+        or os.environ.get("FIELD_MARSHAL_LMSTUDIO_API_TOKEN")
+        or _API_TOKEN
+        or ""
+    ).strip()
+    if token and "YOUR_LM_STUDIO" not in token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
 def _embed(texts: list[str]) -> list[list[float]]:
     """Call LM Studio embedding endpoint."""
     url = f"{_BASE_URL}/v1/embeddings"
-    headers = {
-        "Authorization": f"Bearer {_API_TOKEN}",
-        "Content-Type": "application/json",
-    }
+    headers = _lmstudio_headers()
     payload = {"model": _EMBED_MODEL, "input": texts}
     resp = requests.post(url, headers=headers, json=payload, timeout=60)
     resp.raise_for_status()

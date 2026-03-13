@@ -1,0 +1,26 @@
+{
+  "id": "phase1_spine_sample",
+  "stage": "report",
+  "parent_id": null,
+  "inputs": [
+    "docs/BIBLE.md"
+  ],
+  "outputs": [
+    "src/field_marshal/api/app.py"
+  ],
+  "params": {
+    "objective": "phase1 spine scaffold"
+  },
+  "status": "succeeded",
+  "qa": {
+    "checks": [
+      "compileall",
+      "pytest"
+    ]
+  },
+  "retry_count": 0,
+  "timestamps": {
+    "created_at": "2026-03-13T21:41:25.170547+00:00",
+    "updated_at": "2026-03-13T21:41:25.170547+00:00"
+  }
+}

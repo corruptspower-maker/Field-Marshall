@@ -41,6 +41,27 @@ _BONDSMAN_MODEL = _LMS["llm_model"]
 _LORD_MODEL = _LMS["lord_model"]
 _ROUTER_URL = f"http://{_CFG['router']['host']}:{_CFG['router']['port']}"
 
+# Runtime-selectable model state (thread-safe).
+_model_lock = threading.Lock()
+_active_models = {
+    "mode": "dual",
+    "bondsman_model": _BONDSMAN_MODEL,
+    "lord_model": _LORD_MODEL,
+}
+
+
+def _lmstudio_headers() -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    token = str(
+        os.environ.get("LM_STUDIO_API_TOKEN")
+        or os.environ.get("FIELD_MARSHAL_LMSTUDIO_API_TOKEN")
+        or _API_TOKEN
+        or ""
+    ).strip()
+    if token and "YOUR_LM_STUDIO" not in token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
 # ---------------------------------------------------------------------------
 # Persona loading
 # ---------------------------------------------------------------------------
@@ -126,10 +147,7 @@ def _llm(
     timeout: int = 60,
 ) -> str:
     url = f"{_BASE_URL}/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {_API_TOKEN}",
-        "Content-Type": "application/json",
-    }
+    headers = _lmstudio_headers()
     payload = {
         "model": model,
         "messages": messages,
@@ -144,8 +162,60 @@ def _llm(
     return msg.get("content") or msg.get("reasoning_content", "")
 
 
+def get_active_models() -> dict[str, str]:
+    with _model_lock:
+        return dict(_active_models)
+
+
+def set_active_models(
+    *,
+    mode: Optional[str] = None,
+    bondsman_model: Optional[str] = None,
+    lord_model: Optional[str] = None,
+) -> dict[str, str]:
+    """Update runtime model configuration.
+
+    mode: "single" or "dual"
+      - single: one selected model is used for both Bondsman and Lord
+      - dual: separate models are used
+    """
+    with _model_lock:
+        current_mode = _active_models["mode"]
+        if mode is not None:
+            normalized = str(mode).strip().lower()
+            if normalized not in ("single", "dual"):
+                raise ValueError("mode must be 'single' or 'dual'")
+            current_mode = normalized
+            _active_models["mode"] = normalized
+
+        if bondsman_model:
+            _active_models["bondsman_model"] = str(bondsman_model).strip()
+        if lord_model:
+            _active_models["lord_model"] = str(lord_model).strip()
+
+        if current_mode == "single":
+            # In single mode, both roles intentionally use one model.
+            chosen = _active_models["bondsman_model"] or _active_models["lord_model"]
+            if not chosen:
+                raise ValueError("a model must be selected for single mode")
+            _active_models["bondsman_model"] = chosen
+            _active_models["lord_model"] = chosen
+
+        return dict(_active_models)
+
+
+def _bondsman_model_name() -> str:
+    with _model_lock:
+        return _active_models["bondsman_model"]
+
+
+def _lord_model_name() -> str:
+    with _model_lock:
+        return _active_models["lord_model"]
+
+
 def bondsman_chat(messages: list[dict]) -> str:
-    return _llm(_BONDSMAN_MODEL, messages, temperature=0.7, timeout=90)
+    return _llm(_bondsman_model_name(), messages, temperature=0.7, timeout=90)
 
 
 # ---------------------------------------------------------------------------
@@ -180,7 +250,7 @@ def _lord_opening_challenge(
         {"role": "system", "content": _LORD_SYSTEM},
         {"role": "user", "content": content},
     ]
-    return _llm(_LORD_MODEL, messages, temperature=0.4, timeout=60)
+    return _llm(_lord_model_name(), messages, temperature=0.4, timeout=60)
 
 
 def _lord_evaluate(challenge: str, bondsman_defense: str) -> str:
@@ -197,7 +267,7 @@ def _lord_evaluate(challenge: str, bondsman_defense: str) -> str:
             ),
         },
     ]
-    return _llm(_LORD_MODEL, messages, temperature=0.3, timeout=60)
+    return _llm(_lord_model_name(), messages, temperature=0.3, timeout=60)
 
 
 def lord_bondsman_dialogue(
@@ -588,8 +658,9 @@ _init_rag()
 
 if __name__ == "__main__":
     print("Field Marshal starting up...")
-    print(f"Bondsman model: {_BONDSMAN_MODEL}")
-    print(f"Lord model: {_LORD_MODEL}")
+    active = get_active_models()
+    print(f"Bondsman model: {active['bondsman_model']}")
+    print(f"Lord model: {active['lord_model']}")
     print(f"Router: {_ROUTER_URL}")
 
     # Start supervision watcher thread only when running as a standalone process

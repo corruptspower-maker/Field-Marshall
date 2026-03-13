@@ -138,6 +138,75 @@ html, body {
 }
 .clear-btn:hover { border-color: var(--lord); color: var(--lord); }
 
+/* ---- Model Controls ---- */
+.model-controls {
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(15, 52, 96, 0.35), rgba(13, 27, 42, 0.65));
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.model-controls-title {
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.model-controls-row {
+  display: grid;
+  grid-template-columns: 86px 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.hidden-row {
+  display: none;
+}
+
+.model-controls-row label {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.model-select {
+  min-width: 0;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.model-select:focus {
+  outline: none;
+  border-color: var(--bondsman);
+}
+
+.model-size {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.model-controls-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.model-controls-actions .send-btn {
+  height: 30px;
+  padding: 0 12px;
+}
+
 /* ---- Chat Messages ---- */
 .chat-messages {
   flex: 1 1 auto;
@@ -146,8 +215,6 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
 }
 
 .msg {
@@ -292,8 +359,6 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
 }
 
 .feed-entry {
@@ -364,3 +429,44 @@ html, body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+/* ---- Responsive ---- */
+@media (max-width: 980px) {
+  html, body { overflow: auto; }
+
+  .topbar {
+    height: auto;
+    min-height: 48px;
+    gap: 10px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar-status {
+    width: 100%;
+    gap: 8px;
+  }
+
+  .main-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100vh - 48px);
+  }
+
+  .chat-panel,
+  .feed-panel {
+    max-width: 100%;
+    flex: 1 1 auto;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    min-height: 42vh;
+  }
+
+  .model-controls-row {
+    grid-template-columns: 74px 1fr;
+  }
+
+  .model-size {
+    grid-column: 2;
+  }
+}

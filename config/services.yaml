@@ -1,0 +1,13 @@
+workers:
+  planner:
+    enabled: false
+    command: python -m field_marshal.core.orchestrator
+  critic:
+    enabled: false
+    command: python -m field_marshal.core.orchestrator
+
+gateways:
+  inpaint:
+    adapter: field_marshal.adapters.web.inpaint_adapter
+  image_to_video:
+    adapter: field_marshal.adapters.web.image_to_video_adapter

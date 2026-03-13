@@ -13,6 +13,8 @@ import uuid
 from collections import deque
 import logging
 import base64
+import re
+from typing import Any
 
 from flask import Flask, Response, jsonify, render_template, request
 import os
@@ -42,6 +44,100 @@ except (OSError, json.JSONDecodeError):
     _config = {}
 
 _AGENT_CLAIM_TIMEOUT = _config.get("timeouts", {}).get("agent_claim_timeout", 60)
+_LMS_CFG = _config.get("lmstudio", {})
+_LMS_BASE_URL = _LMS_CFG.get("base_url", "http://localhost:1234")
+_LMS_API_TOKEN = _LMS_CFG.get("api_token", "")
+
+
+def _lmstudio_headers() -> dict[str, str]:
+    headers = {"Content-Type": "application/json"}
+    token = str(
+        os.environ.get("LM_STUDIO_API_TOKEN")
+        or os.environ.get("FIELD_MARSHAL_LMSTUDIO_API_TOKEN")
+        or _LMS_API_TOKEN
+        or ""
+    ).strip()
+    if token and "YOUR_LM_STUDIO" not in token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _safe_import_field_marshal():
+    """Best-effort import of local brain module for model control and fallback chat."""
+    try:
+        import field_marshal as _fm  # type: ignore
+        return _fm
+    except Exception:
+        return None
+
+
+def _infer_model_size_label(model_id: str, raw: dict[str, Any]) -> str:
+    # Prefer explicit numeric byte fields if present.
+    for key in ("size", "size_bytes", "parameter_size"):
+        val = raw.get(key)
+        if isinstance(val, int) and val > 0:
+            gib = val / (1024**3)
+            return f"{gib:.1f} GB"
+        if isinstance(val, float) and val > 0:
+            gib = val / (1024**3)
+            return f"{gib:.1f} GB"
+
+    # Fallback: infer from model id, e.g. qwen3.5-9b, granite-2b.
+    m = re.search(r"(\d+(?:\.\d+)?)\s*[bB](?:\b|[^a-zA-Z0-9])", model_id)
+    if m:
+        return f"{m.group(1)}B"
+    return "unknown"
+
+
+def _list_lmstudio_models() -> list[dict[str, Any]]:
+    headers = _lmstudio_headers()
+    resp = requests.get(f"{_LMS_BASE_URL}/v1/models", headers=headers, timeout=8)
+    resp.raise_for_status()
+    payload = resp.json()
+    models = payload.get("data", []) if isinstance(payload, dict) else []
+
+    result = []
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        model_id = str(item.get("id", "")).strip()
+        if not model_id:
+            continue
+        result.append(
+            {
+                "id": model_id,
+                "size_label": _infer_model_size_label(model_id, item),
+                "raw": item,
+            }
+        )
+    return result
+
+
+def _default_active_models() -> dict[str, str]:
+    bondsman = _LMS_CFG.get("llm_model", "")
+    lord = _LMS_CFG.get("lord_model", bondsman)
+    return {
+        "mode": "single" if bondsman and bondsman == lord else "dual",
+        "bondsman_model": bondsman,
+        "lord_model": lord,
+    }
+
+
+def _get_active_models() -> dict[str, str]:
+    fm = _safe_import_field_marshal()
+    if fm and hasattr(fm, "get_active_models"):
+        try:
+            return fm.get_active_models()
+        except Exception:
+            pass
+    return _default_active_models()
+
+
+def _set_active_models(mode: str | None, bondsman_model: str | None, lord_model: str | None) -> dict[str, str]:
+    fm = _safe_import_field_marshal()
+    if not fm or not hasattr(fm, "set_active_models"):
+        raise RuntimeError("field_marshal runtime model control is unavailable")
+    return fm.set_active_models(mode=mode, bondsman_model=bondsman_model, lord_model=lord_model)
 
 # ---------------------------------------------------------------------------
 # Shared state
@@ -126,7 +222,15 @@ def _enforce_task_auth():
           * If FM_SHARED_TOKEN is set, require it via header or query param.
     """
     path = request.path or ""
-    protected_prefixes = ("/task/", "/tasks", "/evidence", "/chat", "/stream")
+    protected_prefixes = (
+        "/task/",
+        "/tasks",
+        "/evidence",
+        "/chat",
+        "/stream",
+        "/events",
+        "/api/models",
+    )
     if not any(path.startswith(p) for p in protected_prefixes):
         return None
 
@@ -407,8 +511,8 @@ def chat():
     if not user_input:
         return jsonify({"error": "empty message"}), 400
 
-    # Forward the chat message to the external Field Marshal brain service.
-    # The target URL can be overridden via FIELD_MARSHAL_CHAT_URL.
+    # Forward chat to external brain when configured/running, then fall back
+    # to local in-process brain so GUI remains usable in single-process mode.
     brain_url = os.environ.get("FIELD_MARSHAL_CHAT_URL", "http://127.0.0.1:8001/chat")
     try:
         resp = requests.post(brain_url, json={"message": user_input}, timeout=10)
@@ -418,8 +522,15 @@ def chat():
         response_text = data.get("response") if isinstance(data, dict) else str(data)
         if not response_text:
             response_text = str(data)
-    except Exception as exc:  # pragma: no cover
-        response_text = f"[Field Marshal unavailable: {exc}]"
+    except Exception:
+        fm = _safe_import_field_marshal()
+        if fm and hasattr(fm, "handle_chat") and hasattr(fm, "get_bondsman_history"):
+            try:
+                response_text = fm.handle_chat(user_input, fm.get_bondsman_history())
+            except Exception as exc:  # pragma: no cover
+                response_text = f"[Field Marshal unavailable: {exc}]"
+        else:
+            response_text = "[Field Marshal unavailable: external service unreachable and local brain not loaded]"
 
     _push_sse("status", {"event": "chat_response", "preview": response_text[:80]})
     return jsonify({"response": response_text}), 200
@@ -451,6 +562,62 @@ def stream():
             "X-Accel-Buffering": "no",
         },
     )
+
+
+@app.route("/events", methods=["POST"])
+def events_ingest():
+    """Ingest events from field_marshal.py for SSE broadcast."""
+    body = request.get_json(force=True, silent=True) or {}
+    if not isinstance(body, dict):
+        return jsonify({"error": "invalid payload"}), 400
+    event_type = str(body.get("type", "status")).strip() or "status"
+    data = body.get("data", {})
+    if not isinstance(data, dict):
+        data = {"value": data}
+    _push_sse(event_type, data)
+    return jsonify({"status": "ok"}), 200
+
+
+@app.route("/api/models/available", methods=["GET"])
+def api_models_available():
+    """Return models reported by LM Studio, including inferred size labels."""
+    try:
+        models = _list_lmstudio_models()
+    except Exception as exc:
+        return jsonify({"error": f"failed to fetch LM Studio models: {exc}", "models": []}), 502
+    return jsonify({"models": models}), 200
+
+
+@app.route("/api/models/active", methods=["GET"])
+def api_models_active_get():
+    return jsonify(_get_active_models()), 200
+
+
+@app.route("/api/models/active", methods=["POST"])
+def api_models_active_set():
+    body = request.get_json(force=True, silent=True) or {}
+    if not isinstance(body, dict):
+        return jsonify({"error": "invalid payload"}), 400
+
+    mode = body.get("mode")
+    model = body.get("model")
+    bondsman_model = body.get("bondsman_model")
+    lord_model = body.get("lord_model")
+
+    # Convenience for single-model payloads.
+    if model and not bondsman_model:
+        bondsman_model = model
+    if mode == "single" and model:
+        lord_model = model
+
+    try:
+        updated = _set_active_models(mode, bondsman_model, lord_model)
+        _push_sse("status", {"event": "models_updated", **updated})
+        return jsonify(updated), 200
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 # ---------------------------------------------------------------------------
