@@ -14,7 +14,6 @@ import os
 import re
 import threading
 import time
-import queue
 from typing import Optional
 
 import requests
@@ -277,8 +276,6 @@ def lord_bondsman_dialogue(
 # ---------------------------------------------------------------------------
 # SSE event push helper (imports router lazily to avoid circular import)
 # ---------------------------------------------------------------------------
-
-_sse_queue: queue.Queue = queue.Queue(maxsize=500)
 
 
 def _push_event(event_type: str, data: dict):
