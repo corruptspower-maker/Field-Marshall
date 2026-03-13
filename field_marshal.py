@@ -205,7 +205,6 @@ def lord_bondsman_dialogue(
     Run the full Lord/Bondsman dialectic.
     Returns list of exchange dicts to inject into bondsman_history.
     """
-    import router  # type: ignore (may not be imported yet)
 
     exchanges = []
 
