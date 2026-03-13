@@ -27,6 +27,13 @@ _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(_BASE_DIR, "config.json")) as _f:
     _CFG = json.load(_f)
 
+# Maximum time (in seconds) to wait for a dispatched task to complete.
+_DEFAULT_TASK_MAX = 300
+if isinstance(_CFG, dict):
+    _TASK_MAX = _CFG.get("timeouts", {}).get("task_max", _DEFAULT_TASK_MAX)
+else:
+    _TASK_MAX = _DEFAULT_TASK_MAX
+
 _LMS = _CFG["lmstudio"]
 _BASE_URL = _LMS["base_url"]
 _API_TOKEN = _LMS["api_token"]
