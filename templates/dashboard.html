@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Field Marshal — Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <!-- Top Bar -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="brand-icon">⚔</span>
+      <span class="brand-name">Field Marshal</span>
+    </div>
+    <div class="topbar-status">
+      <div class="status-pill" id="status-bondsman">
+        <span class="pill-label">Bondsman</span>
+        <span class="pill-value" id="bondsman-model">qwen/qwen3.5-9b</span>
+      </div>
+      <div class="status-pill" id="status-lord">
+        <span class="pill-label">Lord</span>
+        <span class="pill-value" id="lord-model">granite-vision-3.2-2b</span>
+      </div>
+      <div class="status-pill" id="status-router">
+        <span class="pill-label">Router</span>
+        <span class="pill-value" id="router-status">connecting…</span>
+      </div>
+      <div class="status-pill" id="status-tasks">
+        <span class="pill-label">Active Tasks</span>
+        <span class="pill-value" id="active-tasks">0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Layout -->
+  <main class="main-layout">
+    <!-- Left Panel: Chat -->
+    <section class="panel chat-panel">
+      <div class="panel-header">
+        <span class="panel-icon">💬</span>
+        <span class="panel-title">Campaign Chat</span>
+      </div>
+      <div class="chat-messages" id="chat-messages">
+        <div class="msg bondsman">
+          <div class="msg-header">
+            <span class="msg-speaker">BONDSMAN</span>
+            <span class="msg-time">System</span>
+          </div>
+          <div class="msg-body">Field Marshal is online. The campaign awaits your orders.</div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <textarea
+          id="chat-input"
+          class="chat-input"
+          rows="3"
+          placeholder="Issue your orders to the Bondsman…"
+          autofocus
+        ></textarea>
+        <button id="chat-send" class="send-btn" type="button">SEND</button>
+      </div>
+    </section>
+
+    <!-- Right Panel: Live Feed -->
+    <section class="panel feed-panel">
+      <div class="panel-header">
+        <span class="panel-icon">📡</span>
+        <span class="panel-title">Live Activity Feed</span>
+        <button id="feed-clear" class="clear-btn" type="button">Clear</button>
+      </div>
+      <div class="feed-entries" id="feed-entries">
+        <div class="feed-entry status-entry">
+          <span class="feed-ts" id="connect-ts"></span>
+          <span class="feed-text">Connecting to live feed…</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

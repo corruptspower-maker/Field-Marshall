@@ -1,0 +1,49 @@
+{
+  "safe": {
+    "allow_patterns": [
+      "^dir\\b",
+      "^ls\\b",
+      "^echo\\b",
+      "^type\\b",
+      "^cat\\b",
+      "^pwd\\b",
+      "^cd\\b",
+      "^mkdir\\b",
+      "^copy\\b",
+      "^move\\b",
+      "^del\\b",
+      "^python\\b",
+      "^pip\\b",
+      "^git\\b",
+      "^node\\b",
+      "^npm\\b",
+      "^code\\b",
+      "^Get-",
+      "^Set-",
+      "^New-",
+      "^Remove-",
+      "^Invoke-WebRequest\\b",
+      "^Write-",
+      "^Read-"
+    ],
+    "deny_patterns": [
+      "rm\\s+-rf\\s+/",
+      "format\\s+[a-zA-Z]:",
+      "Remove-Item.*-Recurse.*-Force.*C:\\\\",
+      "shutdown",
+      "Restart-Computer",
+      "Stop-Computer",
+      "reg\\s+delete",
+      "netsh.*firewall.*delete",
+      "net\\s+user.*\\/delete",
+      "taskkill.*system",
+      "bcdedit",
+      "diskpart",
+      "cipher.*\\/w"
+    ]
+  },
+  "unsafe": {
+    "allow_patterns": [".*"],
+    "deny_patterns": []
+  }
+}
