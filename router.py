@@ -11,6 +11,7 @@ import threading
 import time
 import uuid
 from collections import deque
+import logging
 
 from flask import Flask, Response, jsonify, render_template, request
 import os
@@ -20,6 +21,7 @@ import os
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__)
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Shared state
@@ -40,7 +42,8 @@ _task_replies: dict[str, dict | None] = {}
 _evidence_queue: deque = deque()
 
 # SSE event queue fed by field_marshal.py supervision watcher
-_sse_queue: queue.Queue = queue.Queue()
+_SSE_QUEUE_MAXSIZE = 1024
+_sse_queue: queue.Queue = queue.Queue(maxsize=_SSE_QUEUE_MAXSIZE)
 
 
 # ---------------------------------------------------------------------------
@@ -56,11 +59,25 @@ def _task_or_404(task_id: str):
 
 
 def _push_sse(event_type: str, data: dict):
-    """Push an event into the SSE queue (non-blocking)."""
+    """Push an event into the SSE queue (non-blocking).
+
+    The queue is bounded; if it is full, drop the oldest event and log a warning.
+    """
+    event = {"type": event_type, "data": data, "ts": time.time()}
     try:
-        _sse_queue.put_nowait({"type": event_type, "data": data, "ts": time.time()})
+        _sse_queue.put_nowait(event)
     except queue.Full:
-        pass
+        # Queue is full: drop the oldest event to make room for the newest one.
+        try:
+            _sse_queue.get_nowait()
+        except queue.Empty:
+            # If the queue was reported full but is now empty, just log and continue.
+            logger.warning("SSE queue reported full but was empty when draining; dropping event %s", event_type)
+        try:
+            _sse_queue.put_nowait(event)
+        except queue.Full:
+            # If we still can't enqueue, drop this event and log.
+            logger.warning("SSE queue is full; dropping event %s", event_type)
 
 
 # ---------------------------------------------------------------------------
