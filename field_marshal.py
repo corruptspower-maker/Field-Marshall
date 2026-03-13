@@ -34,8 +34,6 @@ _API_TOKEN = _LMS["api_token"]
 _BONDSMAN_MODEL = _LMS["llm_model"]
 _LORD_MODEL = _LMS["lord_model"]
 _ROUTER_URL = f"http://{_CFG['router']['host']}:{_CFG['router']['port']}"
-_TASK_TIMEOUT = _CFG["timeouts"]["task_default"]
-_TASK_MAX = _CFG["timeouts"]["task_max"]
 
 # ---------------------------------------------------------------------------
 # Persona loading
