@@ -23,6 +23,15 @@ import os
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
+# Load configuration
+try:
+    with open("config.json", "r", encoding="utf-8") as f:
+        _config = json.load(f)
+except (OSError, json.JSONDecodeError):
+    _config = {}
+
+_AGENT_CLAIM_TIMEOUT = _config.get("timeouts", {}).get("agent_claim_timeout", 60)
+
 # ---------------------------------------------------------------------------
 # Shared state
 # ---------------------------------------------------------------------------
@@ -155,7 +164,7 @@ def task_claim():
     agent_id = body.get("agent_id", "unknown")
     target = body.get("target", "terminal")
     now = time.time()
-    claim_timeout = 60  # seconds
+    claim_timeout = _AGENT_CLAIM_TIMEOUT
 
     with _lock:
         for task in _tasks.values():
