@@ -16,6 +16,7 @@ import base64
 
 from flask import Flask, Response, jsonify, render_template, request
 import os
+import requests
 
 # ---------------------------------------------------------------------------
 # Configuration / limits
@@ -399,11 +400,17 @@ def chat():
     if not user_input:
         return jsonify({"error": "empty message"}), 400
 
-    # Import here to avoid circular import at module level
+    # Forward the chat message to the external Field Marshal brain service.
+    # The target URL can be overridden via FIELD_MARSHAL_CHAT_URL.
+    brain_url = os.environ.get("FIELD_MARSHAL_CHAT_URL", "http://127.0.0.1:8001/chat")
     try:
-        import field_marshal as fm  # type: ignore
-
-        response_text = fm.handle_chat(user_input, fm.get_bondsman_history())
+        resp = requests.post(brain_url, json={"message": user_input}, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        # Expect the external service to return {"response": "..."}; fall back gracefully.
+        response_text = data.get("response") if isinstance(data, dict) else str(data)
+        if not response_text:
+            response_text = str(data)
     except Exception as exc:  # pragma: no cover
         response_text = f"[Field Marshal unavailable: {exc}]"
 
