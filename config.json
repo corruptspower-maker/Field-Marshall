@@ -1,0 +1,13 @@
+{
+  "router": { "host": "127.0.0.1", "port": 5000, "debug": false },
+  "lmstudio": {
+    "base_url": "http://localhost:1234",
+    "api_token": "YOUR_LM_STUDIO_API_TOKEN_HERE",
+    "llm_model": "qwen/qwen3.5-9b",
+    "lord_model": "ibm-granite/granite-vision-3.2-2b",
+    "embed_model": "text-embedding-nomic-embed-text-v1.5-embedding"
+  },
+  "safety_mode": "safe",
+  "timeouts": { "task_default": 30, "task_max": 300, "agent_claim_timeout": 60 },
+  "limits": { "max_output_bytes": 104857, "max_log_days": 7 }
+}

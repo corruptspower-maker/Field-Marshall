@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+rag_db/
+.env
+*.zip
+node_modules/
