@@ -2,7 +2,7 @@
   "router": { "host": "127.0.0.1", "port": 5000, "debug": false },
   "lmstudio": {
     "base_url": "http://localhost:1234",
-    "api_token": "sk-lm-9qZhovaZ:5JjbXW3zpaY3AhafNLMX",
+    "api_token": "YOUR_LM_STUDIO_API_TOKEN_HERE",
     "llm_model": "qwen/qwen3.5-9b",
     "lord_model": "ibm-granite/granite-vision-3.2-2b",
     "embed_model": "text-embedding-nomic-embed-text-v1.5-embedding"
