@@ -12,6 +12,7 @@ import time
 import uuid
 from collections import deque
 import logging
+import base64
 
 from flask import Flask, Response, jsonify, render_template, request
 import os
@@ -340,6 +341,20 @@ def evidence_submit():
                     }
                 ),
                 413,
+            )
+        # Validate that screenshot_b64 contains valid base64 data to prevent
+        # downstream failures when constructing data:image URLs.
+        try:
+            # validate=True enforces that the string contains only valid base64 characters.
+            base64.b64decode(screenshot_b64, validate=True)
+        except Exception:
+            return (
+                jsonify(
+                    {
+                        "error": "Field 'screenshot_b64' must be valid base64-encoded data",
+                    }
+                ),
+                400,
             )
 
     packet.setdefault("timestamp", time.time())
