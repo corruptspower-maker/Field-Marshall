@@ -48,7 +48,8 @@ _sse_queue: queue.Queue = queue.Queue()
 # ---------------------------------------------------------------------------
 
 def _task_or_404(task_id: str):
-    task = _tasks.get(task_id)
+    with _lock:
+        task = _tasks.get(task_id)
     if task is None:
         return None, jsonify({"error": "task not found", "task_id": task_id}), 404
     return task, None, None
